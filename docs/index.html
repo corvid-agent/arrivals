@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>ARRIVALS · Arcron TestNet</title>
+  <meta name="description" content="Public TestNet flight board for Arcron keepers. Who showed up. Who is late. Who is grounded. Read-only. No wallet.">
+  <meta name="theme-color" content="#070806">
+  <meta property="og:title" content="ARRIVALS · Arcron TestNet">
+  <meta property="og:description" content="Who showed up. Who is late. Who is grounded.">
+  <meta property="og:type" content="website">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=Bebas+Neue&family=Share+Tech+Mono&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="hall">
+    <div class="tape" aria-hidden="true">
+      <span>TESTNET ONLY</span><span>NO WALLET</span><span>CHAIN IS SOURCE OF TRUTH</span>
+      <span>TESTNET ONLY</span><span>NO WALLET</span><span>CHAIN IS SOURCE OF TRUTH</span>
+    </div>
+
+    <header class="lintel">
+      <div class="lintel-left">
+        <p class="station">GATE CRV</p>
+        <p class="substation">Algorand TestNet · keeper <a id="keeper-link" href="https://testnet.explorer.perawallet.app/application/769891898">769891898</a></p>
+      </div>
+      <h1 class="mast">ARRIVALS</h1>
+      <div class="lintel-right">
+        <div class="crt-clock" title="Algod last-round">
+          <div class="crt-label">LAST ROUND</div>
+          <div class="crt-digits" id="round-digits">········</div>
+          <div class="crt-scan" aria-hidden="true"></div>
+        </div>
+      </div>
+    </header>
+
+    <section class="legend" aria-label="Board status">
+      <div class="pill ontime"><span class="lamp"></span> ON TIME <strong id="n-ontime">—</strong></div>
+      <div class="pill delayed"><span class="lamp"></span> DELAYED <strong id="n-delayed">—</strong></div>
+      <div class="pill grounded"><span class="lamp"></span> GROUNDED <strong id="n-grounded">—</strong></div>
+      <div class="pill total">FLIGHTS <strong id="n-total">—</strong></div>
+      <div class="feed">
+        <span id="feed-mode" class="mode unknown">SEEKING</span>
+        <span id="feed-note" class="note">prefer live indexer · snapshot if CORS fails</span>
+      </div>
+    </section>
+
+    <div class="toolbar">
+      <div class="sorts" role="group" aria-label="Sort board">
+        <button type="button" data-sort="eta" class="active">ETA</button>
+        <button type="button" data-sort="status">STATUS</button>
+        <button type="button" data-sort="flt">FLT</button>
+      </div>
+      <p class="rule">GROUNDED if escrow &lt; fee · DELAYED if round &gt; next execution · else ON TIME</p>
+    </div>
+
+    <main class="housing" id="board-housing">
+      <div class="screws" aria-hidden="true"><i></i><i></i><i></i><i></i></div>
+      <div class="board-head" aria-hidden="true">
+        <span class="col flt">FLT</span>
+        <span class="col dest">DESTINATION</span>
+        <span class="col eta">NEXT ROUND</span>
+        <span class="col wait">WAIT</span>
+        <span class="col intv">INTERVAL</span>
+        <span class="col runs">RUNS</span>
+        <span class="col bag">ESCROW</span>
+        <span class="col pol">POLICY</span>
+        <span class="col st">STATUS</span>
+      </div>
+      <div id="board" class="board" role="table" aria-label="Upkeep arrivals"></div>
+      <p id="empty" class="empty hidden">No boxes on keeper 769891898.</p>
+    </main>
+
+    <footer class="apron">
+      <p>
+        corvid-agent experiment · not the
+        <a href="https://corvidlabs.xyz/arcron/console/">Arcron console</a>.
+        Read-only. Refresh 30s.
+        Source: <a href="https://github.com/corvid-agent/arrivals">github.com/corvid-agent/arrivals</a>.
+      </p>
+      <p class="fine" id="stamp">Arcron is unaudited. TestNet only. Do not treat a private roster as source of truth.</p>
+    </footer>
+  </div>
+  <noscript>
+    <p class="noscript">This board needs JavaScript to read TestNet boxes. A static snapshot lives in snapshot.json.</p>
+  </noscript>
+  <script src="app.js"></script>
+</body>
+</html>
