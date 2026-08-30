@@ -12,7 +12,15 @@ Keeper app [`769891898`](https://testnet.explorer.perawallet.app/application/769
 
 ## Status
 
-Under construction. The board should read boxes `u||itob(id)` from the public TestNet indexer and paint ON TIME / DELAYED / GROUNDED.
+The board reads boxes `u || itob(id)` from the public TestNet indexer and paints **ON TIME / DELAYED / GROUNDED**.
+
+- **GROUNDED** if `balance < fee_per_execution`
+- **DELAYED** if current round `> next_execution_round`
+- else **ON TIME**
+
+Friendly names are only the public facts: keeper `769891898`, pulse `769891902`, rain hub `770130162`. Everything else stays numeric. Destinations link to the Pera TestNet explorer.
+
+Live fetch prefers [testnet-idx.algonode.cloud](https://testnet-idx.algonode.cloud) plus algod `/v2/status` for last-round. If the browser cannot reach the indexer (CORS or network), the board falls back to `docs/snapshot.json`. A weekday workflow refreshes that snapshot. Refresh in the page is every 30s.
 
 ## Bounds
 
