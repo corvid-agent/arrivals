@@ -468,16 +468,17 @@
     board.replaceChildren();
     if (!rframe || !rframe.rains || !rframe.rains.length) {
       empty.classList.remove("hidden");
-      empty.textContent = rframe ? "NO RAIN RECORDS ON HUB " + RAIN_HUB : "NO RAIN DATA";
-      note.textContent = "hub " + RAIN_HUB + " · " + (rframe ? rframe.mode : "feed down");
+      empty.textContent = rframe ? "NO RAIN RECORDS ON HUB" : "NO RAIN DATA";
+      note.textContent = rframe ? rframe.mode + " · no records" : "feed down";
       return;
     }
     empty.classList.add("hidden");
     const hub = rframe.hub || {};
-    note.textContent = "hub " + RAIN_HUB +
-      (hub.next_rain_id != null ? " · next_rain_id " + hub.next_rain_id : "") +
-      (hub.cursor != null ? " · cursor " + hub.cursor : "") +
-      " · " + (rframe.mode === "live" ? "live" : "snapshot");
+    const parts = [];
+    if (hub.next_rain_id != null) parts.push("next_rain_id " + hub.next_rain_id);
+    if (hub.cursor != null) parts.push("cursor " + hub.cursor);
+    parts.push(rframe.mode === "live" ? "live" : "snapshot");
+    note.textContent = parts.join(" · ");
 
     rframe.rains.forEach((r, idx) => {
       const row = document.createElement("div");
