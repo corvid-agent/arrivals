@@ -25,6 +25,18 @@ Unknown apps stay numeric and still link to the Pera TestNet explorer.
 
 Live fetch prefers [testnet-idx.algonode.cloud](https://testnet-idx.algonode.cloud) plus algod `/v2/status` for last-round. If the browser cannot reach the indexer (CORS or network), the board falls back to `docs/snapshot.json`. A weekday workflow refreshes that snapshot. Refresh in the page is every 30s.
 
+## Rain sub-board
+
+Below the main board, a **RAIN · RESOLVE WINDOW** section lists the rain
+records of hub [`770130162`](https://testnet.explorer.perawallet.app/application/770130162)
+(target of upkeep 91), read live from hub global state and `r || itob(id)`
+boxes. Only the inline name (offset 64) and the box naming scheme are
+verified layout; the interval (offset 112) and round field (offset 120) are
+shown labeled as inferred, and the WINDOW column stays `?` because the
+charter's ~800-round draw/resolve window cannot be verified from the
+inferred layout. If the snapshot has no rain data, the section degrades to
+a subtle NO RAIN DATA state without touching the main board.
+
 ## Bounds
 
 - TestNet only. No MainNet.
