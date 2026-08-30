@@ -18,7 +18,10 @@ The board reads boxes `u || itob(id)` from the public TestNet indexer and paints
 - **DELAYED** if current round `> next_execution_round`
 - else **ON TIME**
 
-Friendly names are only the public facts: keeper `769891898`, pulse `769891902`, rain hub `770130162`. Everything else stays numeric. Destinations link to the Pera TestNet explorer.
+Friendly names come from `docs/names.json`, an optional overlay of public
+facts only — keeper `769891898`, pulse `769891902`, rain hub `770130162`.
+It is display sugar, never source of truth; chain boxes decide the board.
+Unknown apps stay numeric and still link to the Pera TestNet explorer.
 
 Live fetch prefers [testnet-idx.algonode.cloud](https://testnet-idx.algonode.cloud) plus algod `/v2/status` for last-round. If the browser cannot reach the indexer (CORS or network), the board falls back to `docs/snapshot.json`. A weekday workflow refreshes that snapshot. Refresh in the page is every 30s.
 
