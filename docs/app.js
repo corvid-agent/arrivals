@@ -1,6 +1,7 @@
 /* ARRIVALS — TestNet Arcron keeper board. Read-only. No wallet. */
 (() => {
   const KEEPER = 769891898;
+  const RAIN_HUB = 770130162;
   const INDEXER = "https://testnet-idx.algonode.cloud";
   const ALGOD = "https://testnet-api.algonode.cloud";
   const EXPLORER = "https://testnet.explorer.perawallet.app/application/";
@@ -113,6 +114,13 @@
     return out;
   }
 
+  function b64ToText(b64) {
+    const bytes = b64ToBytes(b64);
+    let out = "";
+    for (const b of bytes) out += String.fromCharCode(b);
+    return out;
+  }
+
   function u64(dv, off) {
     return dv.getUint32(off) * 0x100000000 + dv.getUint32(off + 4);
   }
@@ -144,6 +152,47 @@
       asset_fee: u64(dv, 114),
       asset_balance: u64(dv, 122),
     };
+  }
+
+  function rainBoxIdFromName(b64name) {
+    const raw = b64ToBytes(b64name);
+    if (raw.length !== 9 || raw[0] !== 114) return null;
+    const dv = new DataView(raw.buffer, raw.byteOffset, raw.byteLength);
+    return u64(dv, 1);
+  }
+
+  // Rain record layout is INFERRED from the five live r-boxes, not from a
+  // spec (see issue #3). Verified across all five: 224-byte boxes named
+  // "r" || itob(id), name is inline null-terminated ASCII at offset 64.
+  // uint64s at offsets 112/120 behave like an interval and a recent round,
+  // but their exact meaning is unverified — so the charter's ~800-round
+  // resolve window cannot be computed on-chain and the WINDOW column
+  // stays "?" rather than guessing.
+  function decodeRain(id, bytes) {
+    if (bytes.length < 128) throw new Error("short rain " + id);
+    const dv = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+    let end = 64;
+    while (end < 104 && bytes[end] !== 0) end++;
+    let name = "";
+    for (let i = 64; i < end; i++) {
+      const c = bytes[i];
+      name += c >= 32 && c < 127 ? String.fromCharCode(c) : " ";
+    }
+    return {
+      id,
+      name: name.trim() || "rain " + id,
+      interval_rounds: u64(dv, 112),
+      round_ref: u64(dv, 120),
+    };
+  }
+
+  function decodeHubState(params) {
+    const state = {};
+    const kvs = (params && params["global-state"]) || [];
+    for (const kv of kvs) {
+      if (kv.value && kv.value.type === 2) state[b64ToText(kv.key)] = kv.value.uint;
+    }
+    return state;
   }
 
   function statusOf(u, round) {
@@ -199,7 +248,7 @@
       const cell = document.createElement("span");
       cell.className = "flap";
       cell.style.setProperty("--d", (i * 28) + "ms");
-      cell.textContent = s[i] === " " ? "\u00a0" : s[i];
+      cell.textContent = s[i] === " " ? " " : s[i];
       wrap.appendChild(cell);
     }
     return wrap;
@@ -232,9 +281,9 @@
     }
   }
 
-  async function listBoxes() {
+  async function listBoxes(appId) {
     const boxes = [];
-    let url = INDEXER + "/v2/applications/" + KEEPER + "/boxes";
+    let url = INDEXER + "/v2/applications/" + appId + "/boxes";
     for (let i = 0; i < 20; i++) {
       const page = await fetchJson(url);
       for (const b of page.boxes || []) {
@@ -242,7 +291,7 @@
         boxes.push(name);
       }
       if (!page["next-token"]) break;
-      url = INDEXER + "/v2/applications/" + KEEPER + "/boxes?next=" + encodeURIComponent(page["next-token"]);
+      url = INDEXER + "/v2/applications/" + appId + "/boxes?next=" + encodeURIComponent(page["next-token"]);
     }
     return boxes;
   }
@@ -250,7 +299,7 @@
   async function fetchLive() {
     const status = await fetchJson(ALGOD + "/v2/status");
     const last_round = status["last-round"];
-    const names = await listBoxes();
+    const names = await listBoxes(KEEPER);
     const upkeeps = await Promise.all(names.map(async (name) => {
       const id = boxIdFromName(name);
       if (id == null) return null;
@@ -274,6 +323,33 @@
       mode: "fallback",
       note: "snapshot " + (snap.generated_at || "") + " · live fetch failed",
       generated_at: snap.generated_at,
+    };
+  }
+
+  async function fetchRainLive() {
+    const app = await fetchJson(INDEXER + "/v2/applications/" + RAIN_HUB);
+    const hub = decodeHubState(app.application && app.application.params);
+    const names = await listBoxes(RAIN_HUB);
+    const rains = await Promise.all(names.map(async (name) => {
+      const id = rainBoxIdFromName(name);
+      if (id == null) return null;
+      const box = await fetchJson(INDEXER + "/v2/applications/" + RAIN_HUB + "/box?name=b64:" + encodeURIComponent(name));
+      return decodeRain(id, b64ToBytes(box.value));
+    }));
+    return {
+      hub,
+      rains: rains.filter(Boolean).sort((a, b) => a.id - b.id),
+      mode: "live",
+    };
+  }
+
+  async function fetchRainSnapshot() {
+    const snap = await fetchJson("snapshot.json");
+    if (!snap.rain || !Array.isArray(snap.rain.rains)) return null;
+    return {
+      hub: snap.rain.hub || {},
+      rains: snap.rain.rains,
+      mode: "fallback",
     };
   }
 
@@ -385,6 +461,56 @@
     stamp.textContent = "Arcron is unaudited. TestNet only. last-round " + round + " · " + when + " · chain is source of truth.";
   }
 
+  function renderRain(rframe) {
+    const board = document.getElementById("rain-board");
+    const empty = document.getElementById("rain-empty");
+    const note = document.getElementById("rain-hub-note");
+    board.replaceChildren();
+    if (!rframe || !rframe.rains || !rframe.rains.length) {
+      empty.classList.remove("hidden");
+      empty.textContent = rframe ? "NO RAIN RECORDS ON HUB " + RAIN_HUB : "NO RAIN DATA";
+      note.textContent = "hub " + RAIN_HUB + " · " + (rframe ? rframe.mode : "feed down");
+      return;
+    }
+    empty.classList.add("hidden");
+    const hub = rframe.hub || {};
+    note.textContent = "hub " + RAIN_HUB +
+      (hub.next_rain_id != null ? " · next_rain_id " + hub.next_rain_id : "") +
+      (hub.cursor != null ? " · cursor " + hub.cursor : "") +
+      " · " + (rframe.mode === "live" ? "live" : "snapshot");
+
+    rframe.rains.forEach((r, idx) => {
+      const row = document.createElement("div");
+      row.className = "rain-row";
+      row.setAttribute("role", "row");
+      row.style.setProperty("--row", String(idx));
+
+      const rid = document.createElement("div");
+      rid.appendChild(flaps("R" + String(r.id).padStart(2, "0"), "18px"));
+
+      const name = document.createElement("div");
+      name.appendChild(flaps(String(r.name).slice(0, 18).toUpperCase(), "16px"));
+
+      const intv = document.createElement("div");
+      intv.className = "crt-num";
+      intv.title = "uint64 at r-box offset 112 · inferred interval, not from a spec";
+      intv.textContent = intervalLabel(r.interval_rounds);
+
+      const rnd = document.createElement("div");
+      rnd.className = "crt-num";
+      rnd.title = "uint64 at r-box offset 120 · round-like field, exact meaning unverified";
+      rnd.textContent = String(r.round_ref);
+
+      const win = document.createElement("div");
+      win.className = "status-tag unknown";
+      win.title = "charter window ~800 rounds, but draw/resolve rounds are not verifiable from the inferred box layout (issue #3)";
+      win.textContent = "?";
+
+      row.append(rid, name, intv, rnd, win);
+      board.appendChild(row);
+    });
+  }
+
   async function tick() {
     try {
       const live = await fetchLive();
@@ -401,6 +527,20 @@
     }
   }
 
+  async function tickRain() {
+    try {
+      renderRain(await fetchRainLive());
+    } catch (err) {
+      console.warn("live rain fetch failed, trying snapshot", err);
+      try {
+        renderRain(await fetchRainSnapshot());
+      } catch (err2) {
+        console.warn("rain snapshot failed", err2);
+        renderRain(null);
+      }
+    }
+  }
+
   document.querySelectorAll(".sorts button").forEach((btn) => {
     btn.addEventListener("click", () => {
       sortMode = btn.getAttribute("data-sort");
@@ -410,5 +550,7 @@
   });
 
   loadOptionalNames().finally(tick);
+  tickRain();
   setInterval(tick, REFRESH_MS);
+  setInterval(tickRain, REFRESH_MS);
 })();
