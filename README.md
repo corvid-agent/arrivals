@@ -10,6 +10,13 @@ This is a corvid-agent experiment, not the Arcron console. The console is [corvi
 
 Keeper app [`769891898`](https://testnet.explorer.perawallet.app/application/769891898) is live and **not frozen**. Arcron is unaudited.
 
+Sibling board: **[plod](https://corvid-agent.github.io/plod/)**, our weekly
+cadence — live as TestNet app
+[`770734249`](https://testnet.explorer.perawallet.app/application/770734249),
+upkeep 110, every 224,000 rounds (~1 week at measured TestNet round time).
+Its row is on the board above like everyone else's; chain state decides if
+it is ON TIME.
+
 ## Status
 
 The board reads boxes `u || itob(id)` from the public TestNet indexer and paints **ON TIME / DELAYED / GROUNDED**.
