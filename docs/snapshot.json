@@ -115,7 +115,7 @@
       "target_app": 769891902,
       "interval_rounds": 1286,
       "next_execution_round": 66818168,
-      "fee_per_execution": 10000,
+      "fee_per_execution": 4000,
       "balance": 3020701,
       "times_executed": 40,
       "policy": 1,
@@ -482,5 +482,89 @@
       "asset_fee": 0,
       "asset_balance": 0
     }
-  ]
+  ],
+  "rain": {
+    "hub": {
+      "cursor": 4,
+      "bootstrapped": 1,
+      "next_rain_id": 5
+    },
+    "rains": [
+      {
+        "id": 1,
+        "name": "Corvid daily",
+        "prize_asset": 0,
+        "drip": 50000,
+        "interval_rounds": 30857,
+        "last_rain_round": 66827958,
+        "pot": 850000,
+        "tickets": 1,
+        "draw_id": 2,
+        "mode": 0,
+        "wave_cap": 0,
+        "commit_round": 0,
+        "prize_locked": 0
+      },
+      {
+        "id": 2,
+        "name": "Corvid GM",
+        "prize_asset": 0,
+        "drip": 50000,
+        "interval_rounds": 30857,
+        "last_rain_round": 66793135,
+        "pot": 950000,
+        "tickets": 1,
+        "draw_id": 1,
+        "mode": 2,
+        "wave_cap": 10,
+        "commit_round": 0,
+        "prize_locked": 0
+      },
+      {
+        "id": 3,
+        "name": "live ALGO one",
+        "prize_asset": 0,
+        "drip": 50000,
+        "interval_rounds": 10,
+        "last_rain_round": 66831686,
+        "pot": 200000,
+        "tickets": 3,
+        "draw_id": 7,
+        "mode": 1,
+        "wave_cap": 0,
+        "commit_round": 66831694,
+        "prize_locked": 50000
+      },
+      {
+        "id": 4,
+        "name": "live ASA split",
+        "prize_asset": 770131837,
+        "drip": 1000,
+        "interval_rounds": 10,
+        "last_rain_round": 66793135,
+        "pot": 0,
+        "tickets": 1,
+        "draw_id": 5,
+        "mode": 0,
+        "wave_cap": 0,
+        "commit_round": 0,
+        "prize_locked": 0
+      },
+      {
+        "id": 5,
+        "name": "swarm audit split",
+        "prize_asset": 0,
+        "drip": 10000,
+        "interval_rounds": 30,
+        "last_rain_round": 66807253,
+        "pot": 0,
+        "tickets": 2,
+        "draw_id": 5,
+        "mode": 0,
+        "wave_cap": 0,
+        "commit_round": 0,
+        "prize_locked": 0
+      }
+    ]
+  }
 }
