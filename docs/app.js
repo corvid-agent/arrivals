@@ -23,7 +23,7 @@
     0x72be5d74f27b896fn, 0x80deb1fe3b1696b1n, 0x9bdc06a725c71235n, 0xc19bf174cf692694n,
     0xe49b69c19ef14ad2n, 0xefbe4786384f25e3n, 0x0fc19dc68b8cd5b5n, 0x240ca1cc77ac9c65n,
     0x2de92c6f592b0275n, 0x4a7484aa6ea6e483n, 0x5cb0a9dcbd41fbd4n, 0x76f988da831153b5n,
-    0x983e5152ee66dfabn, 0xa831c66d2db43210n, 0xb00327c898fb213fn, 0xbf597fc7beef0ee4n,
+    0x983e5152ee66dfab, 0xa831c66d2db43210n, 0xb00327c898fb213fn, 0xbf597fc7beef0ee4n,
     0xc6e00bf33da88fc2n, 0xd5a79147930aa725n, 0x06ca6351e003826fn, 0x142929670a0e6e70n,
     0x27b70a8546d22ffcn, 0x2e1b21385c26c926n, 0x4d2c6dfc5ac42aedn, 0x53380d139d95b3dfn,
     0x650a73548baf63den, 0x766a0abb3c77b2a8n, 0x81c2c92e47edaee6n, 0x92722c851482353bn,
@@ -161,18 +161,32 @@
     return u64(dv, 1);
   }
 
-  // Rain record layout is INFERRED from the five live r-boxes, not from a
-  // spec (see issue #3). Verified across all five: 224-byte boxes named
-  // "r" || itob(id), name is inline null-terminated ASCII at offset 64.
-  // uint64s at offsets 112/120 behave like an interval and a recent round,
-  // but their exact meaning is unverified — so the charter's ~800-round
-  // resolve window cannot be computed on-chain and the WINDOW column
-  // stays "?" rather than guessing.
+  // RainRec layout VERIFIED against the rain contract source:
+  // CorvidLabs/arcron smart_contracts/rain/contract.py @ ea83b069
+  // (also specs/rain/rain.spec.md). Box "r" || itob(id), 224 bytes,
+  // ARC-4 struct, big-endian, tightly packed:
+  //   0  creator address (32B)        128  pot u64
+  //  32  gate_creator address (32B)   136  tickets u64
+  //  64  label byte[32] zero-padded   144  draw_id u64
+  //  96  prize_asset u64              152  cumulative u64
+  // 104  drip u64                     160  mode u64 (0 SPLIT, 1 ONE, 2 WAVE)
+  // 112  interval_rounds u64          168  wave_cap u64
+  // 120  last_rain_round u64          208  commit_round u64 · 216 prize_locked u64
+  // ONE lifecycle (same source): draw locks `drip` at fire and sets
+  // commit_round = fire_round + COMMIT_DELAY (8); resolve is valid for
+  // commit_round < round <= commit_round + SEED_WINDOW (800); past that
+  // abandon returns the lock to the pot. resolve/abandon both reset
+  // prize_locked and commit_round to 0, so a settled draw reads as
+  // "no draw open". SPLIT/WAVE have no resolve window.
+  const RAIN_COMMIT_DELAY = 8;
+  const RAIN_SEED_WINDOW = 800;
+  const RAIN_MODES = ["SPLIT", "ONE", "WAVE"];
+
   function decodeRain(id, bytes) {
-    if (bytes.length < 128) throw new Error("short rain " + id);
+    if (bytes.length < 224) throw new Error("short rain " + id);
     const dv = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
     let end = 64;
-    while (end < 104 && bytes[end] !== 0) end++;
+    while (end < 96 && bytes[end] !== 0) end++;
     let name = "";
     for (let i = 64; i < end; i++) {
       const c = bytes[i];
@@ -181,8 +195,75 @@
     return {
       id,
       name: name.trim() || "rain " + id,
+      prize_asset: u64(dv, 96),
+      drip: u64(dv, 104),
       interval_rounds: u64(dv, 112),
-      round_ref: u64(dv, 120),
+      last_rain_round: u64(dv, 120),
+      pot: u64(dv, 128),
+      tickets: u64(dv, 136),
+      draw_id: u64(dv, 144),
+      mode: u64(dv, 160),
+      wave_cap: u64(dv, 168),
+      commit_round: u64(dv, 208),
+      prize_locked: u64(dv, 216),
+    };
+  }
+
+  function rainModeLabel(mode) {
+    return RAIN_MODES[mode] || "MODE " + mode;
+  }
+
+  // Real resolve-window status from the verified fields above.
+  function rainWindow(r, round) {
+    const mode = rainModeLabel(r.mode);
+    if (r.mode !== 1) {
+      if (r.mode !== 0 && r.mode !== 2) {
+        return { text: "MODE " + r.mode, sub: "unknown", cls: "unknown", title: "unrecognized mode u64 at r-box offset 160" };
+      }
+      return {
+        text: r.mode === 2 ? "GM WAVE" : "AUTO-SPLIT",
+        sub: "no window",
+        cls: "ontime",
+        title: mode + " rain · fires split the drip automatically · no resolve window in the contract",
+      };
+    }
+    const lockNote = "draw " + r.draw_id + " · locked " + r.prize_locked + " µ units · commit round " + r.commit_round;
+    if (!r.prize_locked) {
+      const due = r.last_rain_round + r.interval_rounds;
+      const isDue = round != null && round >= due;
+      return {
+        text: "WAITING DRAW",
+        sub: round != null ? (isDue ? "draw due" : "in " + (due - round) + "r") : "due " + due,
+        cls: isDue ? "delayed" : "ontime",
+        title: "ONE rain · no draw open · next fire due round " + due,
+      };
+    }
+    const resolveBy = r.commit_round + RAIN_SEED_WINDOW;
+    if (round == null) {
+      return { text: "DRAW OPEN", sub: "by " + resolveBy, cls: "delayed", title: lockNote + " · resolve by round " + resolveBy };
+    }
+    if (round <= r.commit_round) {
+      return {
+        text: "SEED LOCK",
+        sub: "T-" + (r.commit_round - round) + "r",
+        cls: "delayed",
+        title: lockNote + " (fire + " + RAIN_COMMIT_DELAY + ") · seed not readable until the commit round passes",
+      };
+    }
+    if (round <= resolveBy) {
+      const left = resolveBy - round;
+      return {
+        text: "RESOLVE",
+        sub: left + "r left",
+        cls: left < 200 ? "delayed" : "ontime",
+        title: lockNote + " · resolve by round " + resolveBy + " (commit + " + RAIN_SEED_WINDOW + ") · " + left + "r left",
+      };
+    }
+    return {
+      text: "MISSED",
+      sub: "abandonable",
+      cls: "grounded",
+      title: lockNote + " · seed window closed at round " + resolveBy + " · abandon() now returns the lock to the pot",
     };
   }
 
@@ -248,7 +329,7 @@
       const cell = document.createElement("span");
       cell.className = "flap";
       cell.style.setProperty("--d", (i * 28) + "ms");
-      cell.textContent = s[i] === " " ? " " : s[i];
+      cell.textContent = s[i] === " " ? " " : s[i];
       wrap.appendChild(cell);
     }
     return wrap;
@@ -327,6 +408,8 @@
   }
 
   async function fetchRainLive() {
+    const status = await fetchJson(ALGOD + "/v2/status");
+    const last_round = status["last-round"];
     const app = await fetchJson(INDEXER + "/v2/applications/" + RAIN_HUB);
     const hub = decodeHubState(app.application && app.application.params);
     const names = await listBoxes(RAIN_HUB);
@@ -339,6 +422,7 @@
     return {
       hub,
       rains: rains.filter(Boolean).sort((a, b) => a.id - b.id),
+      last_round,
       mode: "live",
     };
   }
@@ -349,6 +433,7 @@
     return {
       hub: snap.rain.hub || {},
       rains: snap.rain.rains,
+      last_round: snap.last_round,
       mode: "fallback",
     };
   }
@@ -474,9 +559,11 @@
     }
     empty.classList.add("hidden");
     const hub = rframe.hub || {};
+    const round = rframe.last_round != null ? rframe.last_round : null;
     const parts = [];
     if (hub.next_rain_id != null) parts.push("next_rain_id " + hub.next_rain_id);
     if (hub.cursor != null) parts.push("cursor " + hub.cursor);
+    if (round != null) parts.push("round " + round);
     parts.push(rframe.mode === "live" ? "live" : "snapshot");
     note.textContent = parts.join(" · ");
 
@@ -492,22 +579,34 @@
       const name = document.createElement("div");
       name.appendChild(flaps(String(r.name).slice(0, 18).toUpperCase(), "16px"));
 
+      const mode = document.createElement("div");
+      mode.className = "tiny";
+      mode.title = "mode u64 at r-box offset 160 · 0 SPLIT · 1 ONE · 2 WAVE";
+      mode.textContent = rainModeLabel(r.mode);
+
       const intv = document.createElement("div");
       intv.className = "crt-num";
-      intv.title = "uint64 at r-box offset 112 · inferred interval, not from a spec";
+      intv.title = "interval_rounds u64 at r-box offset 112 · drip " + r.drip + " µ units" + (r.prize_asset ? " of asset " + r.prize_asset : " (ALGO)");
       intv.textContent = intervalLabel(r.interval_rounds);
 
-      const rnd = document.createElement("div");
-      rnd.className = "crt-num";
-      rnd.title = "uint64 at r-box offset 120 · round-like field, exact meaning unverified";
-      rnd.textContent = String(r.round_ref);
+      const due = r.last_rain_round + r.interval_rounds;
+      const next = document.createElement("div");
+      next.className = "crt-num";
+      next.title = "last_rain_round " + r.last_rain_round + " (offset 120) + interval " + r.interval_rounds + (round != null && round >= due ? " · due now" : "");
+      next.textContent = String(due);
 
+      const w = rainWindow(r, round);
       const win = document.createElement("div");
-      win.className = "status-tag unknown";
-      win.title = "charter window ~800 rounds, but draw/resolve rounds are not verifiable from the inferred box layout (issue #3)";
-      win.textContent = "?";
+      const tag = document.createElement("div");
+      tag.className = "status-tag " + w.cls;
+      tag.title = w.title;
+      tag.textContent = w.text;
+      const wsub = document.createElement("div");
+      wsub.className = "tiny rain-win-sub";
+      wsub.textContent = w.sub;
+      win.append(tag, wsub);
 
-      row.append(rid, name, intv, rnd, win);
+      row.append(rid, name, mode, intv, next, win);
       board.appendChild(row);
     });
   }
