@@ -115,7 +115,7 @@
       "target_app": 769891902,
       "interval_rounds": 1286,
       "next_execution_round": 66818168,
-      "fee_per_execution": 4000,
+      "fee_per_execution": 10000,
       "balance": 3020701,
       "times_executed": 40,
       "policy": 1,
