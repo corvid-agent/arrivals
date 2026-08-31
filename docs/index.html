@@ -70,7 +70,7 @@
         <span class="col st">STATUS</span>
       </div>
       <div id="board" class="board" role="table" aria-label="Upkeep arrivals"></div>
-      <p id="empty" class="empty hidden">No boxes on keeper 769891898.</p>
+      <p id="empty" class="hidden empty">No boxes on keeper 769891898.</p>
     </main>
 
     <section class="housing rain-housing" aria-label="Rain resolve windows">
@@ -82,13 +82,14 @@
       <div class="rain-head" aria-hidden="true">
         <span class="col rid">RAIN</span>
         <span class="col rname">NAME</span>
-        <span class="col rint">INTERVAL*</span>
-        <span class="col rrnd">ROUND REF*</span>
+        <span class="col rmode">MODE</span>
+        <span class="col rint">INTERVAL</span>
+        <span class="col rdue">NEXT FIRE</span>
         <span class="col rwin">WINDOW</span>
       </div>
       <div id="rain-board" class="board" role="table" aria-label="Rain records"></div>
       <p id="rain-empty" class="empty hidden">NO RAIN DATA</p>
-      <p class="rule rain-rule">* inferred from r-box layout, not a spec (issue #3) · name is verified chain state · charter: resolve inside ~800r or the drip is abandoned — draw/resolve rounds unverifiable, so WINDOW stays “?”</p>
+      <p class="rule rain-rule">layout verified against CorvidLabs/arcron <code>smart_contracts/rain/contract.py</code> @ ea83b069 · ONE: draw locks the drip, resolve reads the commit-round block seed within 800 rounds (SEED_WINDOW), past it abandon returns the lock · SPLIT/WAVE have no resolve window · RESOLVED draws reset the lock and read as WAITING DRAW</p>
     </section>
 
     <footer class="apron">
