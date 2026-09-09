@@ -17,6 +17,8 @@ ALGOD = "https://testnet-api.algonode.cloud"
 UA = {"User-Agent": "corvid-agent-arrivals-snapshot/1.0"}
 ROOT = Path(__file__).resolve().parents[1]
 OUT = ROOT / "docs" / "snapshot.json"
+HISTORY = ROOT / "docs" / "history.json"
+SKIP_UPKEEP = frozenset({81, 87})
 HEAD = 130
 # Public overlay only. Never invent names. Never label 81 Vigil.
 PUBLIC_APPS = {769891898: "keeper", 769891902: "pulse", 770130162: "rain"}
@@ -141,6 +143,74 @@ def hub_state(app_json: dict) -> dict:
     return state
 
 
+
+def status_of(u: dict, last_round: int) -> str:
+    if int(u["balance"]) < int(u["fee_per_execution"]):
+        return "GROUNDED"
+    if last_round > int(u["next_execution_round"]):
+        return "DELAYED"
+    return "ON TIME"
+
+
+def sample_from_snapshot(snapshot: dict, source: str = "docs/snapshot.json") -> dict:
+    last_round = int(snapshot["last_round"])
+    ontime = delayed = grounded = skipped = 0
+    escrow = fee = 0
+    upkeeps = snapshot.get("upkeeps") or []
+    for u in upkeeps:
+        uid = int(u.get("id") or 0)
+        if uid in SKIP_UPKEEP:
+            skipped += 1
+            continue
+        escrow += int(u.get("balance") or 0)
+        fee += int(u.get("fee_per_execution") or 0)
+        st = status_of(u, last_round)
+        if st == "GROUNDED":
+            grounded += 1
+        elif st == "DELAYED":
+            delayed += 1
+        else:
+            ontime += 1
+    return {
+        "t": snapshot.get("generated_at") or "",
+        "network": "testnet",
+        "keeper_app": int(snapshot.get("keeper_app") or KEEPER),
+        "round": last_round,
+        "listed": len(upkeeps),
+        "ontime": ontime,
+        "delayed": delayed,
+        "grounded": grounded,
+        "skipped": skipped,
+        "escrow_micro": escrow,
+        "fee_pressure_micro": fee,
+        "source": source,
+    }
+
+
+def append_history(snapshot: dict) -> None:
+    """Append one TestNet history row if last_round is new. Never invent rounds."""
+    row = sample_from_snapshot(snapshot)
+    last_round = int(row["round"])
+    rows: list = []
+    if HISTORY.exists():
+        try:
+            loaded = json.loads(HISTORY.read_text())
+            if isinstance(loaded, list):
+                rows = loaded
+        except json.JSONDecodeError:
+            rows = []
+    if any(int(r.get("round") or 0) == last_round for r in rows if isinstance(r, dict)):
+        print(f"history.json unchanged (round {last_round} already present)")
+        return
+    rows.append(row)
+    HISTORY.write_text(json.dumps(rows, indent=2) + "\n")
+    print(
+        f"appended history.json round={last_round} "
+        f"ontime={row['ontime']} delayed={row['delayed']} grounded={row['grounded']} "
+        f"escrow_micro={row['escrow_micro']}"
+    )
+
+
 def main() -> None:
     status = get(f"{ALGOD}/v2/status")
     last_round = status["last-round"]
@@ -189,6 +259,7 @@ def main() -> None:
         },
     }
     OUT.write_text(json.dumps(snapshot, indent=2) + "\n")
+    append_history(snapshot)
     ids = [u["id"] for u in upkeeps]
     print(f"wrote {OUT} upkeeps={len(upkeeps)} ids={ids} last_round={last_round} rains={len(rains)}")
     if skipped:

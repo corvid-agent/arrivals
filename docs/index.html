@@ -73,6 +73,38 @@
       <p id="empty" class="hidden empty">No boxes on keeper 769891898.</p>
     </main>
 
+
+    <section class="graphs" id="graphs" aria-label="Arrivals TestNet history graphs">
+      <div class="graph-cell">
+        <div class="label">STATUS MIX OVER TIME</div>
+        <canvas id="mix-canvas" width="640" height="160" aria-label="ontime delayed grounded over samples"></canvas>
+        <div class="graph-legend">
+          <span class="lg ontime">on time</span>
+          <span class="lg delayed">delayed</span>
+          <span class="lg grounded">grounded</span>
+        </div>
+        <div class="meta" id="mix-meta">sqlite 0 samples</div>
+      </div>
+      <div class="graph-cell">
+        <div class="label">ESCROW µALGO</div>
+        <canvas id="escrow-canvas" width="640" height="160" aria-label="total escrow and fee pressure over samples"></canvas>
+        <div class="graph-legend">
+          <span class="lg ontime">escrow</span>
+          <span class="lg delayed">fee pressure</span>
+        </div>
+        <div class="meta" id="escrow-meta">TestNet only</div>
+      </div>
+      <div class="graph-cell wide">
+        <div class="label">LISTED FLIGHTS</div>
+        <canvas id="listed-canvas" width="640" height="120" aria-label="listed upkeep count over samples"></canvas>
+        <div class="graph-legend">
+          <span class="lg ontime">listed</span>
+          <span class="lg grounded">skipped 81/87</span>
+        </div>
+        <div class="meta" id="listed-meta">append-only history.json</div>
+      </div>
+    </section>
+
     <section class="housing rain-housing" aria-label="Rain resolve windows">
       <div class="screws" aria-hidden="true"><i></i><i></i><i></i><i></i></div>
       <div class="rain-title">
@@ -111,6 +143,7 @@
   <noscript>
     <p class="noscript">This board needs JavaScript to read TestNet boxes. A static snapshot lives in snapshot.json.</p>
   </noscript>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.11.0/sql-wasm.js"></script>
   <script src="app.js"></script>
 </body>
 </html>

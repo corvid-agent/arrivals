@@ -32,6 +32,23 @@ Unknown apps stay numeric and still link to the Pera TestNet explorer.
 
 Live fetch prefers [testnet-idx.algonode.cloud](https://testnet-idx.algonode.cloud) plus algod `/v2/status` for last-round. If the browser cannot reach the indexer (CORS or network), the board falls back to `docs/snapshot.json`. A weekday workflow refreshes that snapshot. Refresh in the page is every 30s.
 
+
+## History graphs
+
+Below the flight board, phosphor canvases paint append-only TestNet history from
+[`docs/history.json`](docs/history.json) via in-page [sql.js](https://sql.js.org/).
+Each weekday snapshot refresh also appends one sample when `last_round` is new
+(status mix · escrow µALGO · listed count). Status rules match the board
+(GROUNDED / DELAYED / ON TIME). History aggregates skip upkeeps **81** and **87**;
+they may still appear as numeric rows on the live board. Never LocalNet-as-TestNet.
+Chain boxes remain source of truth; graphs are a rolling board memory.
+
+Append offline from a checkout:
+
+```bash
+python3 scripts/refresh_snapshot.py   # writes snapshot.json and appends history.json
+```
+
 ## Rain sub-board
 
 Below the main board, a **RAIN · RESOLVE WINDOW** section lists the rain

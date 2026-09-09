@@ -1,0 +1,16 @@
+[
+  {
+    "t": "2026-09-09T13:34:22Z",
+    "network": "testnet",
+    "keeper_app": 769891898,
+    "round": 67137922,
+    "listed": 36,
+    "ontime": 15,
+    "delayed": 7,
+    "grounded": 13,
+    "skipped": 1,
+    "escrow_micro": 44907418,
+    "fee_pressure_micro": 176000,
+    "source": "docs/snapshot.json@seed"
+  }
+]

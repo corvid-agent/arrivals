@@ -1,4 +1,5 @@
-/* ARRIVALS — TestNet Arcron keeper board. Read-only. No wallet. */
+/* ARRIVALS — TestNet Arcron keeper board. Read-only. No wallet.
+   Graphs paint appending TestNet history via in-page SQLite (sql.js). */
 (() => {
   const KEEPER = 769891898;
   const RAIN_HUB = 770130162;
@@ -454,6 +455,230 @@
     return copy;
   }
 
+
+  const PHOS = "#8cff6a";
+  const AMBER = "#ffbf40";
+  const HOT = "#ff4b32";
+  const DIM = "#8a8678";
+  const DEAD = "#2f6b2c";
+  const SKIP_UPKEEP = new Set([81, 87]);
+
+  function sizeCanvas(c) {
+    const w = c.width;
+    const h = c.height;
+    const ctx = c.getContext("2d");
+    return { ctx, w, h };
+  }
+
+  function sampleFromFrame(frame, source) {
+    const round = Number(frame.last_round || 0);
+    let ontime = 0, delayed = 0, grounded = 0, skipped = 0;
+    let escrow = 0, fee = 0;
+    const upkeeps = frame.upkeeps || [];
+    for (const u of upkeeps) {
+      const uid = Number(u.id || 0);
+      if (SKIP_UPKEEP.has(uid)) {
+        skipped += 1;
+        continue;
+      }
+      escrow += Number(u.balance || 0);
+      fee += Number(u.fee_per_execution || 0);
+      const st = statusOf(u, round);
+      if (st === "GROUNDED") grounded += 1;
+      else if (st === "DELAYED") delayed += 1;
+      else ontime += 1;
+    }
+    return {
+      t: frame.generated_at || new Date().toISOString().replace(/\.\d{3}Z$/, "Z"),
+      network: "testnet",
+      keeper_app: KEEPER,
+      round,
+      listed: upkeeps.length,
+      ontime,
+      delayed,
+      grounded,
+      skipped,
+      escrow_micro: escrow,
+      fee_pressure_micro: fee,
+      source: source || "live",
+    };
+  }
+
+  function drawSeries(ctx, w, h, series, color, max) {
+    if (!series.length) return;
+    const pad = 16;
+    ctx.beginPath();
+    series.forEach((v, i) => {
+      const px = pad + (i * (w - pad * 2)) / Math.max(1, series.length - 1);
+      const py = h - pad - (v / max) * (h - pad * 2);
+      if (i === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
+    });
+    ctx.strokeStyle = color;
+    ctx.lineWidth = 2;
+    ctx.shadowColor = color;
+    ctx.shadowBlur = 6;
+    ctx.stroke();
+    ctx.shadowBlur = 0;
+  }
+
+  function drawMix(rows) {
+    const c = document.getElementById("mix-canvas");
+    const meta = document.getElementById("mix-meta");
+    if (!c) return;
+    const { ctx, w, h } = sizeCanvas(c);
+    ctx.clearRect(0, 0, w, h);
+    if (meta) meta.textContent = "sqlite " + rows.length + " samples · TestNet";
+    if (!rows.length) {
+      ctx.fillStyle = DIM;
+      ctx.font = "12px Share Tech Mono, monospace";
+      ctx.fillText("no history yet", 12, 28);
+      return;
+    }
+    const on = rows.map((r) => Number(r.ontime || 0));
+    const del = rows.map((r) => Number(r.delayed || 0));
+    const gr = rows.map((r) => Number(r.grounded || 0));
+    const max = Math.max(...on, ...del, ...gr, 1);
+    drawSeries(ctx, w, h, on, PHOS, max);
+    drawSeries(ctx, w, h, del, AMBER, max);
+    drawSeries(ctx, w, h, gr, HOT, max);
+    const last = rows[rows.length - 1];
+    ctx.fillStyle = DIM;
+    ctx.font = "10px Share Tech Mono, monospace";
+    ctx.fillText(
+      "r" + last.round + " · " + last.ontime + "/" + last.delayed + "/" + last.grounded,
+      16,
+      14
+    );
+  }
+
+  function drawEscrow(rows) {
+    const c = document.getElementById("escrow-canvas");
+    const meta = document.getElementById("escrow-meta");
+    if (!c) return;
+    const { ctx, w, h } = sizeCanvas(c);
+    ctx.clearRect(0, 0, w, h);
+    if (!rows.length) {
+      ctx.fillStyle = DIM;
+      ctx.font = "12px Share Tech Mono, monospace";
+      ctx.fillText("no history yet", 12, 28);
+      return;
+    }
+    const esc = rows.map((r) => Number(r.escrow_micro || 0));
+    const fee = rows.map((r) => Number(r.fee_pressure_micro || 0));
+    const max = Math.max(...esc, ...fee, 1);
+    drawSeries(ctx, w, h, esc, PHOS, max);
+    drawSeries(ctx, w, h, fee, AMBER, max);
+    const last = rows[rows.length - 1];
+    if (meta) {
+      meta.textContent =
+        "escrow " + Number(last.escrow_micro || 0).toLocaleString() +
+        " µ · fee " + Number(last.fee_pressure_micro || 0).toLocaleString() + " µ";
+    }
+  }
+
+  function drawListed(rows) {
+    const c = document.getElementById("listed-canvas");
+    const meta = document.getElementById("listed-meta");
+    if (!c) return;
+    const { ctx, w, h } = sizeCanvas(c);
+    ctx.clearRect(0, 0, w, h);
+    if (!rows.length) {
+      ctx.fillStyle = DIM;
+      ctx.font = "12px Share Tech Mono, monospace";
+      ctx.fillText("no history yet", 12, 28);
+      return;
+    }
+    const listed = rows.map((r) => Number(r.listed || 0));
+    const skipped = rows.map((r) => Number(r.skipped || 0));
+    const max = Math.max(...listed, ...skipped, 1);
+    drawSeries(ctx, w, h, listed, PHOS, max);
+    drawSeries(ctx, w, h, skipped, HOT, max);
+    const last = rows[rows.length - 1];
+    if (meta) {
+      meta.textContent =
+        "listed " + last.listed + " · skipped " + last.skipped + " · round " + last.round;
+    }
+  }
+
+  let sqlDb = null;
+
+  async function bootSql(rows) {
+    if (typeof initSqlJs !== "function") return rows;
+    const SQL = await initSqlJs({
+      locateFile: (f) => "https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.11.0/" + f,
+    });
+    sqlDb = new SQL.Database();
+    sqlDb.run(
+      "CREATE TABLE samples (t TEXT, network TEXT, keeper_app INTEGER, round INTEGER, listed INTEGER, ontime INTEGER, delayed INTEGER, grounded INTEGER, skipped INTEGER, escrow_micro INTEGER, fee_pressure_micro INTEGER, source TEXT)"
+    );
+    const ins = sqlDb.prepare("INSERT INTO samples VALUES (?,?,?,?,?,?,?,?,?,?,?,?)");
+    rows.forEach((r) => {
+      ins.run([
+        r.t || "",
+        r.network || "testnet",
+        Number(r.keeper_app || KEEPER),
+        Number(r.round || 0),
+        Number(r.listed || 0),
+        Number(r.ontime || 0),
+        Number(r.delayed || 0),
+        Number(r.grounded || 0),
+        Number(r.skipped || 0),
+        Number(r.escrow_micro || 0),
+        Number(r.fee_pressure_micro || 0),
+        r.source || "",
+      ]);
+    });
+    ins.free();
+    const res = sqlDb.exec(
+      "SELECT t, network, keeper_app, round, listed, ontime, delayed, grounded, skipped, escrow_micro, fee_pressure_micro, source FROM samples WHERE network='testnet' AND keeper_app=769891898 ORDER BY round"
+    );
+    if (!res[0]) return rows;
+    return res[0].values.map((v) => ({
+      t: v[0],
+      network: v[1],
+      keeper_app: v[2],
+      round: v[3],
+      listed: v[4],
+      ontime: v[5],
+      delayed: v[6],
+      grounded: v[7],
+      skipped: v[8],
+      escrow_micro: v[9],
+      fee_pressure_micro: v[10],
+      source: v[11],
+    }));
+  }
+
+  async function loadHistoryGraphs(liveSample) {
+    let history = [];
+    try {
+      const res = await fetch("./history.json", { cache: "no-store" });
+      if (res.ok) history = await res.json();
+    } catch (_) {
+      history = [];
+    }
+    if (!Array.isArray(history)) history = [];
+    history = history.filter(
+      (r) =>
+        r &&
+        r.network === "testnet" &&
+        Number(r.keeper_app) === KEEPER
+    );
+    if (liveSample && liveSample.round) {
+      const exists = history.some((r) => Number(r.round) === Number(liveSample.round));
+      if (!exists) history = history.concat([liveSample]);
+    }
+    let rows = history;
+    try {
+      rows = await bootSql(history);
+    } catch (_) {
+      rows = history;
+    }
+    drawMix(rows);
+    drawEscrow(rows);
+    drawListed(rows);
+  }
+
   function setMode(mode, note) {
     const el = document.getElementById("feed-mode");
     el.textContent = mode === "live" ? "LIVE" : mode === "fallback" ? "SNAPSHOT" : "SEEKING";
@@ -544,6 +769,10 @@
     const stamp = document.getElementById("stamp");
     const when = frame.generated_at ? " snapshot " + frame.generated_at : " painted " + new Date().toISOString();
     stamp.textContent = "Arcron is unaudited. TestNet only. last-round " + round + " · " + when + " · chain is source of truth.";
+    const histSource = frame.mode === "live" ? "live" : "docs/snapshot.json";
+    loadHistoryGraphs(sampleFromFrame(frame, histSource)).catch((err) => {
+      console.warn("history graphs failed", err);
+    });
   }
 
   function renderRain(rframe) {
