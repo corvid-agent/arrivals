@@ -824,5 +824,19 @@
     "escrow_micro": 3585974,
     "fee_pressure_micro": 176000,
     "source": "docs/snapshot.json"
+  },
+  {
+    "t": "2026-10-01T01:01:13Z",
+    "network": "testnet",
+    "keeper_app": 769891898,
+    "round": 67826681,
+    "listed": 36,
+    "ontime": 13,
+    "delayed": 2,
+    "grounded": 20,
+    "skipped": 1,
+    "escrow_micro": 3409974,
+    "fee_pressure_micro": 176000,
+    "source": "docs/snapshot.json"
   }
 ]
