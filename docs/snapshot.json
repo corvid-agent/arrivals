@@ -1,8 +1,8 @@
 {
-  "generated_at": "2026-10-27T19:10:34Z",
+  "generated_at": "2026-10-28T00:54:31Z",
   "network": "testnet",
   "keeper_app": 769891898,
-  "last_round": 68683944,
+  "last_round": 68691589,
   "indexer": "https://testnet-idx.algonode.cloud",
   "algod": "https://testnet-api.algonode.cloud",
   "upkeeps": [
@@ -454,13 +454,13 @@
       "creator": "CEPY52VZRWFLQCJZXQRVQFOPMNAD6M4HCDP4XWKVFXRONJTC6KJVWRCXJI",
       "target_app": 770742373,
       "interval_rounds": 30857,
-      "next_execution_round": 68686676,
+      "next_execution_round": 68717533,
       "fee_per_execution": 4000,
-      "balance": 264000,
-      "times_executed": 59,
+      "balance": 260000,
+      "times_executed": 60,
       "policy": 1,
       "fee_cap": 0,
-      "last_serviced_round": 68658444,
+      "last_serviced_round": 68690434,
       "fee_asset": 0,
       "asset_fee": 0,
       "asset_balance": 0
